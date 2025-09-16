@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Mill Display</title>
+  <style>
+    html, body { height: 100%; margin: 0; background: #000; }
+    #wrap { display:flex; align-items:center; justify-content:center; height:100%; }
+    #live { max-width: 100vw; max-height: 100vh; object-fit: contain; background: #111; }
+    #meta { position: fixed; left: 12px; bottom: 8px; color:#ccc; font: 14px system-ui; }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <img id="live" alt="Awaiting photo…" />
+  </div>
+  <div id="meta">Waiting for first image…</div>
+
+  <script>
+    const img = document.getElementById('live');
+    const meta = document.getElementById('meta');
+    let lastTs = 0;
+
+    async function check() {
+      try {
+        const res = await fetch('/.netlify/functions/latest-meta', { cache: 'no-store' });
+        if (!res.ok) throw new Error('meta ' + res.status);
+        const { ts } = await res.json();
+        if (ts && ts !== lastTs) {
+          lastTs = ts;
+          img.src = '/.netlify/functions/latest?ts=' + encodeURIComponent(ts);
+          meta.textContent = new Date(ts).toLocaleString();
+        }
+      } catch (e) {
+        // retry silently
+      } finally {
+        setTimeout(check, 1000);
+      }
+    }
+    check();
+  </script>
+</body>
+</html>

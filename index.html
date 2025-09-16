@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Lab Uploader</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 20px; }
+    .card { max-width: 520px; margin: 0 auto; padding: 16px; border: 1px solid #ddd; border-radius: 8px; }
+    button, input[type="file"], input[type="password"] { font-size: 16px; }
+    #preview { width: 100%; max-height: 60vh; object-fit: contain; display: none; margin-top: 12px; }
+    .row { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+    .grow { flex: 1; }
+    .muted { color: #666; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Upload Mill Sample Photo</h2>
+
+    <div class="row">
+      <input id="pin" class="grow" type="password" placeholder="Upload PIN" autocomplete="off" />
+    </div>
+
+    <input id="file" type="file" accept="image/*" capture="environment" />
+    <p class="muted">Tip: On iPhone, use the camera option. HEIC images are auto-converted to JPEG.</p>
+
+    <img id="preview" alt="Preview" />
+
+    <div class="row">
+      <button id="send">Send to Display</button>
+      <a href="/display" target="_blank" rel="noopener">Open Display</a>
+    </div>
+
+    <div id="status" class="muted"></div>
+  </div>
+
+  <!-- HEIC→JPEG converter (WASM). -->
+  <script src="https://unpkg.com/heic2any/dist/heic2any.min.js"></script>
+  <script>
+    const fileEl = document.getElementById('file');
+    const preview = document.getElementById('preview');
+    const sendBtn = document.getElementById('send');
+    const statusEl = document.getElementById('status');
+    const pinEl = document.getElementById('pin');
+
+    let readyBlob = null;
+
+    fileEl.addEventListener('change', async () => {
+      statusEl.textContent = '';
+      readyBlob = null;
+      preview.style.display = 'none';
+
+      const file = fileEl.files?.[0];
+      if (!file) return;
+
+      try {
+        const type = (file.type || '').toLowerCase();
+        const name = (file.name || '').toLowerCase();
+
+        if (type.includes('heic') || type.includes('heif') || name.endsWith('.heic') || name.endsWith('.heif')) {
+          statusEl.textContent = 'Converting HEIC → JPEG…';
+          const out = await window.heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
+          readyBlob = out instanceof Blob ? out : new Blob([out], { type: 'image/jpeg' });
+        } else {
+          const bmp = await createImageBitmap(file);
+          const canvas = document.createElement('canvas');
+          canvas.width = bmp.width;
+          canvas.height = bmp.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(bmp, 0, 0);
+          readyBlob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.9));
+        }
+
+        preview.src = URL.createObjectURL(readyBlob);
+        preview.style.display = 'block';
+        statusEl.textContent = 'Ready to upload.';
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = 'Error preparing image. Try another photo.';
+      }
+    });
+
+    sendBtn.addEventListener('click', async () => {
+      if (!readyBlob) return statusEl.textContent = 'Pick a photo first.';
+      const pin = pinEl.value.trim();
+      if (!pin) return statusEl.textContent = 'Enter the Upload PIN.';
+
+      try {
+        statusEl.textContent = 'Uploading…';
+        const res = await fetch('/.netlify/functions/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'image/jpeg', 'X-Auth': pin },
+          body: readyBlob
+        });
+        if (!res.ok) {
+          const t = await res.text();
+          throw new Error(t || res.statusText);
+        }
+        statusEl.textContent = 'Uploaded! Check the display.';
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = 'Upload failed: ' + (err?.message || 'Unknown error');
+      }
+    });
+  </script>
+</body>
+</html>
