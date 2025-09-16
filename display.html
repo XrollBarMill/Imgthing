@@ -24,12 +24,12 @@
 
     async function check() {
       try {
-        const res = await fetch('/.netlify/functions/latest-meta', { cache: 'no-store' });
+        const res = await fetch('/.netlify/functions/defect-latest', { cache: 'no-store' });
         if (!res.ok) throw new Error('meta ' + res.status);
         const { ts } = await res.json();
         if (ts && ts !== lastTs) {
           lastTs = ts;
-          img.src = '/.netlify/functions/latest?ts=' + encodeURIComponent(ts);
+          img.src = '/.netlify/functions/defect-image?ts=' + encodeURIComponent(ts);
           meta.textContent = new Date(ts).toLocaleString();
         }
       } catch (e) {
