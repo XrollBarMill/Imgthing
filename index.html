@@ -88,7 +88,7 @@
 
       try {
         statusEl.textContent = 'Uploading…';
-        const res = await fetch('/.netlify/functions/upload', {
+        const res = await fetch('/.netlify/functions/defect-upload', {
           method: 'POST',
           headers: { 'Content-Type': 'image/jpeg', 'X-Auth': pin },
           body: readyBlob
